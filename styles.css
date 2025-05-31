@@ -1,0 +1,70 @@
+
+body {
+  font-family: Arial, sans-serif;
+  max-width: 1000px;
+  margin: auto;
+  padding: 20px;
+  line-height: 1.6;
+}
+h1 {
+  font-size: 42px;
+  font-weight: bold;
+  color: #222;
+  margin-bottom: 25px;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+h2 {
+  font-size: 22px;
+  color: #333;
+  font-weight: bold;
+  margin-top: 32px;
+  margin-bottom: 12px;
+}
+
+h3 {
+  font-size: 18px;
+  color: #555;
+  margin-top: 24px;
+  margin-bottom: 8px;
+}
+
+a { color: #007acc; text-decoration: none; }
+.article-title {
+  font-size: 36px;
+  font-weight: bold;
+  margin: 20px 0;
+  display: block;
+}
+
+.article-meta { color: #777; font-size: 14px; margin-bottom: 10px; }
+
+.affiliate-box {
+  background-color: #fdf4d7;
+  border: 2px dashed #ffa500;
+  padding: 15px;
+  margin-top: 30px;
+  font-size: 18px;
+  border-radius: 6px;
+  text-align: left;
+}
+
+.affiliate-box a {
+  color: #0066cc;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.affiliate-box a:hover {
+  text-decoration: underline;
+  color: #004999;
+}
+.main-title {
+  font-size: 42px;
+  font-weight: 800;
+  color: #111;
+  margin-bottom: 30px;
+}
+
