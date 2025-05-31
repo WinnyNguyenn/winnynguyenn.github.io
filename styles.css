@@ -14,7 +14,13 @@ h2 {
 }
 
 a { color: #007acc; text-decoration: none; }
-.article-title { font-size: 24px; margin: 10px 0; display: block; }
+.article-title {
+  font-size: 36px;
+  font-weight: bold;
+  margin: 20px 0;
+  display: block;
+}
+
 .article-meta { color: #777; font-size: 14px; margin-bottom: 10px; }
 
 .affiliate-box {
