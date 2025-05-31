@@ -6,6 +6,7 @@ h1 {
   margin-bottom: 20px;
   word-wrap: break-word;
   overflow-wrap: break-word;
+white-space: normal;
 }
 
 h2 {
