@@ -4,3 +4,24 @@ h1, h2 { color: #333; }
 a { color: #007acc; text-decoration: none; }
 .article-title { font-size: 24px; margin: 10px 0; display: block; }
 .article-meta { color: #777; font-size: 14px; margin-bottom: 10px; }
+
+.affiliate-box {
+  background-color: #fdf4d7;
+  border: 2px dashed #ffa500;
+  padding: 15px;
+  margin-top: 30px;
+  font-size: 18px;
+  border-radius: 6px;
+  text-align: left;
+}
+
+.affiliate-box a {
+  color: #0066cc;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.affiliate-box a:hover {
+  text-decoration: underline;
+  color: #004999;
+}
