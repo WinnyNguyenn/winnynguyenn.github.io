@@ -66,4 +66,26 @@ a { color: #007acc; text-decoration: none; }
   color: #111;
   margin-bottom: 30px;
 }
+.affiliate-box {
+  background-color: #fdf4d7;
+  border: 2px dashed #ffa500;
+  padding: 15px;
+  margin-top: 30px;
+  font-size: 18px;
+  border-radius: 6px;
+  text-align: left;
+}
+
+.affiliate-box a {
+  color: #0066cc;
+  font-weight: bold;
+  text-decoration: none;
+  font-size: 20px;
+}
+
+.affiliate-box a:hover {
+  text-decoration: underline;
+  color: #004999;
+}
+
 
