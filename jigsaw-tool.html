@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Jigsaw Puzzle Tool</title>
+
+<!-- JSZip + FileSaver (ZIP) + jsPDF (PDF) -->
+<script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<style>
+:root{
+  --brand:#ff7a1a; --ink:#111; --muted:#6b7280; --line:#e5e7eb;
+  --chip:#f3f4f6; --chip-on:#fff6ef; --chip-border:#e5e7eb;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+.wrap{display:grid;grid-template-columns:360px 1fr;gap:18px;max-width:1200px;margin:24px auto;padding:0 16px}
+header{display:flex;align-items:center;gap:10px;margin:10px 0 4px}
+header .dot{width:10px;height:10px;border-radius:50%;background:var(--brand)}
+h1{font-size:18px;margin:0}
+.panel{border:1px solid var(--line);border-radius:14px;padding:16px;position:sticky;top:16px;align-self:start}
+.group{margin:12px 0}
+.group h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 8px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:var(--chip);border:1px solid var(--chip-border);padding:8px 10px;border-radius:10px;cursor:pointer;user-select:none}
+.chip.on{background:var(--chip-on);border-color:var(--brand);color:var(--brand);font-weight:600}
+.subchips{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.subchip{padding:8px 10px;border-radius:10px;border:1px solid var(--chip-border);background:#fff;cursor:pointer}
+.subchip.on{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.row{display:flex;gap:10px}
+.row .box{flex:1}
+select,input[type="number"],input[type="text"]{width:100%;padding:10px 12px;border:1px solid var(--chip-border);border-radius:10px;background:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 14px;border-radius:12px;background:var(--brand);color:#fff;border:none;cursor:pointer;font-weight:600;width:100%}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.check{display:flex;align-items:center;gap:10px;margin:8px 0;color:var(--muted)}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+.viewer{border:1px solid var(--line);border-radius:14px;padding:12px;min-height:520px;display:flex;flex-direction:column}
+.toolbar{display:flex;align-items:center;gap:10px;justify-content:flex-end;margin-bottom:8px}
+.toolbar .fit{padding:6px 10px;border:1px solid var(--chip-border);border-radius:10px;background:#fff;cursor:pointer}
+.progress{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:8px;display:none}
+.bar{height:100%;width:0;background:var(--brand);transition:width .2s}
+canvas{width:100%;height:auto;border-radius:10px;background:#f8fafc}
+.danger{color:#b91c1c}
+.muted{color:var(--muted)}
+.range-row{display:flex;align-items:center;gap:10px}
+.range-row input[type="range"]{flex:1}
+.badge{font-size:12px;color:var(--muted);min-width:38px;text-align:right}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <header><span class="dot"></span><h1>Jigsaw Puzzle Tool</h1></header>
+
+      <!-- BOOK SIZE -->
+      <div class="group" id="bookGroup">
+        <h3>Book size (inches)</h3>
+        <div class="chips" id="bookChips">
+          <div class="chip" data-size="8.5x11">8.5×11</div>
+          <div class="chip" data-size="8x10">8×10</div>
+          <div class="chip" data-size="8.5x8.5">8.5×8.5</div>
+          <div class="chip" data-size="more">More</div>
+        </div>
+        <div id="moreSizes" style="display:none;margin-top:10px">
+          <div class="row">
+            <div class="box">
+              <label class="muted">Preset</label>
+              <select id="morePreset">
+                <option value="">— Select —</option>
+                <option value="5x7">5×7 (in)</option>
+                <option value="A4">A4 (mm)</option>
+                <option value="custom">Custom…</option>
+              </select>
+            </div>
+            <div class="box">
+              <label class="muted">Unit</label>
+              <select id="unitSel">
+                <option value="inch">inch</option>
+                <option value="mm">mm</option>
+                <option value="px">px</option>
+              </select>
+            </div>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <div class="box">
+              <label class="muted">Width</label>
+              <input id="wInput" type="number" step="0.01" min="1" value="2550">
+            </div>
+            <div class="box">
+              <label class="muted">Height</label>
+              <input id="hInput" type="number" step="0.01" min="1" value="3300">
+            </div>
+          </div>
+          <div class="hint">Export targets 300 DPI. With <b>px</b>, it uses your exact pixels.</div>
+        </div>
+      </div>
+
+      <!-- PIECES -->
+      <div class="group">
+        <h3>Pieces</h3>
+        <div class="chips" id="catChips">
+          <div class="chip" data-cat="kids">Kids</div>
+          <div class="chip" data-cat="standard">Standard</div>
+          <div class="chip" data-cat="advance">Advance</div>
+          <div class="chip" data-cat="custom">Custom</div>
+        </div>
+        <div class="subchips" id="kidsRow" style="display:none">
+          <div class="subchip" data-p="12">12</div>
+          <div class="subchip" data-p="24">24</div>
+          <div class="subchip" data-p="48">48</div>
+        </div>
+        <div class="subchips" id="standardRow" style="display:none">
+          <div class="subchip" data-p="100">100</div>
+          <div class="subchip" data-p="300">300</div>
+        </div>
+        <div class="subchips" id="advanceRow" style="display:none">
+          <div class="subchip" data-p="500">500</div>
+          <div class="subchip" data-p="1000">1000</div>
+        </div>
+        <div class="row" id="customRow" style="display:none;margin-top:6px">
+          <div class="box"><label class="muted">Rows</label><input id="rowsInput" type="number" value="6" min="2" max="60"></div>
+          <div class="box"><label class="muted">Cols</label><input id="colsInput" type="number" value="8" min="2" max="60"></div>
+        </div>
+      </div>
+
+      <!-- IMAGE -->
+      <div class="group">
+        <h3>Image</h3>
+        <input id="fileInput" type="file" accept="image/*" multiple style="display:none"/>
+        <button class="chip" id="pickBtn">Choose files</button>
+        <div class="hint">Pick up to <b>5</b> images (PNG/JPG). Images are fitted with <b>cover</b>.</div>
+      </div>
+
+      <!-- CUT LINES -->
+      <div class="group">
+        <h3>Cut lines</h3>
+        <div class="range-row">
+          <span class="muted" style="min-width:70px">Thickness</span>
+          <input id="thickRange" type="range" min="0.6" max="4" step="0.1" value="2.0">
+          <span class="badge" id="thickVal">2.0</span>
+        </div>
+        <div class="range-row" style="margin-top:8px">
+          <span class="muted" style="min-width:70px">Opacity</span>
+          <input id="opacityRange" type="range" min="0.15" max="1" step="0.05" value="0.75">
+          <span class="badge" id="opacityVal">0.75</span>
+        </div>
+        <div class="hint">These apply to both Preview and exported files.</div>
+      </div>
+
+      <!-- EXPORT -->
+      <div class="group">
+        <h3>Export</h3>
+        <label class="check"><input type="checkbox" id="pngAlways" checked disabled> Export PNG (always on)</label>
+        <label class="check"><input type="checkbox" id="pdfOpt"> Export PDF</label>
+        <label class="check"><input type="checkbox" id="extra4"> Include extra 4 files</label>
+        <label class="check"><input type="checkbox" id="remember"> Remember settings</label>
+        <button class="btn" id="genBtn">Generate (ZIP)</button>
+        <div class="progress" id="progress"><div class="bar" id="bar"></div></div>
+        <div id="alert" class="hint danger"></div>
+      </div>
+    </div>
+
+    <!-- PREVIEW -->
+    <div class="viewer">
+      <div class="toolbar">
+        <button class="fit" id="fitBtn">Fit</button>
+        <span class="muted">Zoom</span>
+        <input id="zoomRange" type="range" min="50" max="200" step="1" value="100">
+        <span id="zoomVal" class="muted">100%</span>
+        <button class="fit" id="dlBtn" title="Download last PNG" disabled>⬇</button>
+        <button class="fit" id="clrBtn" title="Clear">🗑</button>
+      </div>
+      <canvas id="preview" width="1200" height="850"></canvas>
+      <div class="hint">Image: <span id="imgIdx">0/0</span></div>
+    </div>
+  </div>
+
+<script>
+/* =========== State =========== */
+const $ = q => document.querySelector(q);
+const $$ = q => document.querySelectorAll(q);
+
+const S = {
+  dpi:300, unit:"inch",
+  W:2550, H:3300, // 8.5x11 at 300 DPI
+  more:false,
+  zoom:1, offset:{x:0,y:0},
+  cat:"kids", pieces:24, rows:6, cols:8,
+  files:[], cur:0,
+  lastPNG:null,
+  line:{ thickness:2.0, opacity:0.75 }
+};
+
+/* =========== Utils =========== */
+function inchToPx(v){ return Math.round(v * S.dpi); }
+function mmToPx(v){ return Math.round(v / 25.4 * S.dpi); }
+function sizeToPx(w,h,unit){
+  if(unit==="inch") return [inchToPx(w), inchToPx(h)];
+  if(unit==="mm")   return [mmToPx(w), mmToPx(h)];
+  return [Math.round(w), Math.round(h)];
+}
+
+// choose rows/cols from total pieces against image aspect
+function pickRowsColsFromPieces(p, w, h){
+  const ratio = w/h;
+  let rows = Math.max(2, Math.round(Math.sqrt(p/ratio)));
+  let cols = Math.max(2, Math.round(p/rows));
+  let best = {rows, cols, diff:Math.abs(rows*cols-p)};
+  const trySet = (r,c)=>{
+    const diff=Math.abs(r*c-p);
+    if(diff<best.diff) best={rows:r,cols:c,diff};
+  };
+  trySet(rows+1, Math.round(p/(rows+1)));
+  trySet(rows-1>1?rows-1:2, Math.round(p/Math.max(2,rows-1)));
+  return [best.rows, best.cols];
+}
+
+// fallback loader for browsers without createImageBitmap
+async function loadBitmap(file){
+  if (window.createImageBitmap) return await createImageBitmap(file);
+  const url = URL.createObjectURL(file);
+  const img = await new Promise((res, rej)=>{
+    const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=url;
+  });
+  URL.revokeObjectURL(url);
+  return img;
+}
+
+// draw jigsaw lines (alternating in/out like real puzzles)
+function drawJigsawLines(ctx, w, h, rows, cols, lw=2, alpha=0.7){
+  ctx.save();
+  ctx.lineWidth = lw;
+  ctx.strokeStyle = `rgba(10,10,10,${alpha})`;
+  ctx.beginPath();
+  const cw = w/cols, ch = h/rows;
+  const r = Math.min(cw, ch) * 0.18;     // knob radius
+  const neck = r * 0.38;                  // small neck for smoother transitions
+
+  // helper: one vertical segment
+  function vSeg(x, y, dir){
+    const mid = y + ch/2;
+    ctx.lineTo(x, mid - r - neck);
+    ctx.quadraticCurveTo(x, mid - r, x + dir*neck, mid - r);
+    ctx.arc(x + dir*r, mid, r, -Math.PI/2, Math.PI/2, dir<0);
+    ctx.quadraticCurveTo(x + dir*neck, mid + r, x, mid + r + neck);
+    ctx.lineTo(x, y + ch);
+  }
+
+  // helper: one horizontal segment
+  function hSeg(x, y, dir){
+    const mid = x + cw/2;
+    ctx.lineTo(mid - r - neck, y);
+    ctx.quadraticCurveTo(mid - r, y, mid - r, y + dir*neck);
+    ctx.arc(mid, y + dir*r, r, Math.PI, 0, dir<0);
+    ctx.quadraticCurveTo(mid + r, y, mid + r + neck, y);
+    ctx.lineTo(x + cw, y);
+  }
+
+  // vertical seams
+  for(let c=1; c<cols; c++){
+    const x = c*cw;
+    ctx.moveTo(x, 0);
+    for(let rIdx=0; rIdx<rows; rIdx++){
+      const dir = ((rIdx + c) % 2 === 0) ? 1 : -1; // alternate
+      vSeg(x, rIdx*ch, dir);
+    }
+  }
+
+  // horizontal seams
+  for(let rIdx=1; rIdx<rows; rIdx++){
+    const y = rIdx*ch;
+    ctx.moveTo(0, y);
+    for(let cIdx=0; cIdx<cols; cIdx++){
+      const dir = ((rIdx + cIdx) % 2 === 0) ? 1 : -1; // alternate
+      hSeg(cIdx*cw, y, dir);
+    }
+  }
+
+  // outer border
+  ctx.rect(0,0,w,h);
+  ctx.stroke();
+  ctx.restore();
+}
+
+const canvas = $("#preview");
+const pctx = canvas.getContext("2d");
+
+/* =========== Preview =========== */
+async function render(){
+  pctx.clearRect(0,0,canvas.width,canvas.height);
+  $("#imgIdx").textContent = S.files.length? `${S.cur+1}/${S.files.length}` : "0/0";
+  if(!S.files.length) return;
+
+  const file = S.files[S.cur];
+  const bmp = await loadBitmap(file);
+  const viewW = canvas.width, viewH = canvas.height;
+
+  const pad = 16;
+  const scaleFit = Math.min((viewW-2*pad)/S.W, (viewH-2*pad)/S.H);
+  const W = S.W*scaleFit, H = S.H*scaleFit;
+  const ax = (viewW-W)/2, ay = (viewH-H)/2;
+
+  const baseScale = Math.max(W/bmp.width, H/bmp.height);
+  const s = baseScale * S.zoom;
+  const dW = bmp.width*s, dH = bmp.height*s;
+  const dx = ax + (W-dW)/2 + S.offset.x*scaleFit;
+  const dy = ay + (H-dH)/2 + S.offset.y*scaleFit;
+
+  pctx.fillStyle="#fff"; pctx.fillRect(ax, ay, W, H);
+  pctx.strokeStyle="#d1d5db"; pctx.strokeRect(ax, ay, W, H);
+  pctx.drawImage(bmp, 0,0,bmp.width,bmp.height, dx,dy,dW,dH);
+
+  let rows=S.rows, cols=S.cols;
+  if(S.cat!=="custom" && S.pieces){ [rows,cols] = pickRowsColsFromPieces(S.pieces, dW, dH); }
+
+  pctx.save();
+  pctx.beginPath(); pctx.rect(dx,dy,dW,dH); pctx.clip();
+  pctx.translate(dx,dy);
+  drawJigsawLines(
+    pctx, dW, dH, rows, cols,
+    Math.max(1, S.line.thickness * Math.min(dW,dH)/1200 * 2.2),
+    S.line.opacity
+  );
+  pctx.restore();
+}
+
+/* =========== Export helpers =========== */
+function downloadBlob(blob, filename){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+}
+
+// Export ONE image → returns array of {path, blob}
+async function exportOneToBlobs(file, idx, opts){
+  const out = [];
+  const bmp = await loadBitmap(file);
+  const W = S.W, H = S.H;
+
+  const oc = new OffscreenCanvas(W,H);
+  const octx = oc.getContext("2d", {alpha:false});
+  octx.fillStyle="#fff"; octx.fillRect(0,0,W,H);
+
+  const baseScale = Math.max(W/bmp.width, H/bmp.height);
+  const s  = baseScale * S.zoom;
+  const dW = bmp.width*s, dH = bmp.height*s;
+  const dx = (W-dW)/2 + S.offset.x;
+  const dy = (H-dH)/2 + S.offset.y;
+  octx.drawImage(bmp, 0,0,bmp.width,bmp.height, dx,dy,dW,dH);
+
+  let rows=S.rows, cols=S.cols;
+  if(S.cat!=="custom" && S.pieces){ [rows,cols] = pickRowsColsFromPieces(S.pieces, dW, dH); }
+
+  octx.save(); octx.beginPath(); octx.rect(dx,dy,dW,dH); octx.clip();
+  octx.translate(dx,dy);
+  drawJigsawLines(octx, dW, dH, rows, cols,
+    Math.max(1, S.line.thickness * Math.min(dW,dH)/1200 * 2.2),
+    S.line.opacity
+  );
+  octx.restore();
+
+  const baseName = file.name.replace(/\.[^.]+$/,"");
+  const pngBlob = await oc.convertToBlob({type:"image/png"});
+  out.push({ path:`${baseName}/image_jigsaw.png`, blob:pngBlob });
+  S.lastPNG = pngBlob;
+
+  if(opts.extra4){
+    // 1: outline (thicker)
+    const oc1 = new OffscreenCanvas(W,H), c1=oc1.getContext("2d",{alpha:false});
+    c1.fillStyle="#fff"; c1.fillRect(0,0,W,H);
+    c1.save(); c1.translate(dx,dy);
+    drawJigsawLines(c1, dW, dH, rows, cols, 4, 1); c1.restore();
+    out.push({ path:`${baseName}/outline.png`, blob: await oc1.convertToBlob({type:"image/png"}) });
+
+    // 2: edges (thin)
+    const oc2 = new OffscreenCanvas(W,H), c2=oc2.getContext("2d",{alpha:false});
+    c2.fillStyle="#fff"; c2.fillRect(0,0,W,H);
+    c2.save(); c2.translate(dx,dy);
+    drawJigsawLines(c2, dW, dH, rows, cols, 2, 0.8); c2.restore();
+    out.push({ path:`${baseName}/edges.png`, blob: await oc2.convertToBlob({type:"image/png"}) });
+
+    // 3: labels
+    const oc3 = new OffscreenCanvas(W,H), c3=oc3.getContext("2d",{alpha:false});
+    c3.fillStyle="#fff"; c3.fillRect(0,0,W,H);
+    c3.save(); c3.translate(dx,dy);
+    c3.fillStyle="#111"; c3.font = Math.round(Math.min(dW,dH)/30)+"px Arial";
+    const cw=dW/cols, ch=dH/rows;
+    for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+      const label = String.fromCharCode(65+r)+(c+1);
+      c3.fillText(label, c*cw+8, r*ch+24);
+    }
+    c3.restore();
+    out.push({ path:`${baseName}/labels.png`, blob: await oc3.convertToBlob({type:"image/png"}) });
+
+    // 4: solution (image + faint grid)
+    const oc4 = new OffscreenCanvas(W,H), c4=oc4.getContext("2d",{alpha:false});
+    c4.fillStyle="#fff"; c4.fillRect(0,0,W,H);
+    c4.drawImage(bmp, 0,0,bmp.width,bmp.height, dx,dy,dW,dH);
+    c4.save(); c4.globalAlpha=.35; c4.translate(dx,dy);
+    drawJigsawLines(c4, dW, dH, rows, cols, 2, 0.7); c4.restore();
+    out.push({ path:`${baseName}/solution.png`, blob: await oc4.convertToBlob({type:"image/png"}) });
+  }
+
+  if(opts.pdf && window.jspdf){
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit:"pt", format:[W,H] });
+    const pngUrl = URL.createObjectURL(pngBlob);
+    const img = await new Promise((res)=>{
+      const i=new Image(); i.onload=()=>res(i); i.src=pngUrl;
+    });
+    pdf.addImage(img, "PNG", 0, 0, W, H);
+    URL.revokeObjectURL(pngUrl);
+    const pdfBlob = pdf.output("blob");
+    out.push({ path:`${baseName}/image_jigsaw.pdf`, blob: pdfBlob });
+  }
+
+  return out;
+}
+
+/* =========== Generate ZIP =========== */
+async function generateZip(){
+  const alertBox = $("#alert");
+  alertBox.textContent = "";
+
+  if (typeof JSZip === "undefined"){
+    alertBox.textContent = "JSZip is not loaded (CDN blocked).";
+    return;
+  }
+  if (typeof saveAs === "undefined"){
+    alertBox.textContent = "FileSaver is not loaded (CDN blocked).";
+    return;
+  }
+  if (!S.files.length){
+    alertBox.textContent = "Please choose at least one image.";
+    return;
+  }
+
+  const zip = new JSZip();
+  const opts = { pdf: $("#pdfOpt").checked, extra4: $("#extra4").checked };
+  const bar = $("#bar"), prog = $("#progress");
+  prog.style.display="block"; bar.style.width="1%";
+
+  try{
+    for(let i=0;i<S.files.length;i++){
+      bar.style.width = Math.round((i/S.files.length)*100)+"%";
+      const pack = await exportOneToBlobs(S.files[i], i, opts);
+      for(const f of pack) zip.file(f.path, f.blob);
+    }
+
+    const readme = `Jigsaw Puzzle Tool export
+Size: ${S.W} x ${S.H} px (${S.unit==='inch' ? '300 DPI' : 'px mode'})
+Lines: thickness ${S.line.thickness}, opacity ${S.line.opacity}
+Category: ${S.cat}${S.cat==='custom' ? ` (rows ${S.rows}, cols ${S.cols})` : ` (~${S.pieces} pieces)`}
+Generated: ${new Date().toISOString()}
+`;
+    zip.file("README.txt", readme);
+
+    bar.style.width="95%";
+    const blob = await zip.generateAsync({type:"blob", compression:"DEFLATE", compressionOptions:{level:6}});
+    saveAs(blob, "jigsaw_puzzle_export.zip");
+    bar.style.width="100%";
+  }catch(err){
+    console.error(err);
+    alertBox.textContent = "Failed to generate ZIP: " + (err?.message || err);
+  }finally{
+    setTimeout(()=>{ prog.style.display="none"; bar.style.width="0"; }, 700);
+    $("#dlBtn").disabled = !!S.lastPNG;
+  }
+}
+
+/* =========== Bind UI =========== */
+const bookMap = {
+  "8.5x11":[8.5,11,"inch"], "8x10":[8,10,"inch"], "8.5x8.5":[8.5,8.5,"inch"]
+};
+$("#bookChips").addEventListener("click", e=>{
+  const chip = e.target.closest(".chip"); if(!chip) return;
+  [...$("#bookChips").children].forEach(x=>x.classList.remove("on"));
+  chip.classList.add("on");
+  if(chip.dataset.size==="more"){ $("#moreSizes").style.display="block"; S.more=true; }
+  else{
+    $("#moreSizes").style.display="none"; S.more=false;
+    const [w,h] = bookMap[chip.dataset.size];
+    const [pxW,pxH]=sizeToPx(w,h,"inch"); S.W=pxW; S.H=pxH; render();
+  }
+});
+
+$("#morePreset").addEventListener("change", ()=>{
+  const v = $("#morePreset").value;
+  if(v==="5x7"){ const [w,h]=sizeToPx(5,7,"inch"); S.W=w; S.H=h; updateMoreFields(5,7,"inch"); }
+  else if(v==="A4"){ const [w,h]=sizeToPx(210,297,"mm"); S.W=w; S.H=h; updateMoreFields(210,297,"mm"); }
+});
+$("#unitSel").addEventListener("change", ()=>{ S.unit=$("#unitSel").value; });
+function updateMoreFields(w,h,unit){ $("#unitSel").value=unit; $("#wInput").value = w; $("#hInput").value = h; }
+["wInput","hInput","unitSel"].forEach(id=>{
+  $("#"+id).addEventListener("input", ()=>{
+    const unit=$("#unitSel").value, w=parseFloat($("#wInput").value||0), h=parseFloat($("#hInput").value||0);
+    if(w>0&&h>0){ const [pxW,pxH]=sizeToPx(w,h,unit); S.W=pxW; S.H=pxH; render(); }
+  });
+});
+
+function showCat(cat){
+  ["kidsRow","standardRow","advanceRow","customRow"].forEach(id=>$("#"+id).style.display="none");
+  if(cat==="kids") $("#kidsRow").style.display="flex";
+  if(cat==="standard") $("#standardRow").style.display="flex";
+  if(cat==="advance") $("#advanceRow").style.display="flex";
+  if(cat==="custom") $("#customRow").style.display="flex";
+}
+$("#catChips").addEventListener("click", e=>{
+  const chip=e.target.closest(".chip"); if(!chip) return;
+  [...$("#catChips").children].forEach(x=>x.classList.remove("on"));
+  chip.classList.add("on"); S.cat=chip.dataset.cat; showCat(S.cat); render();
+});
+["kidsRow","standardRow","advanceRow"].forEach(id=>{
+  $("#"+id).addEventListener("click", e=>{
+    const sc=e.target.closest(".subchip"); if(!sc) return;
+    [...$("#"+id).children].forEach(x=>x.classList.remove("on"));
+    sc.classList.add("on"); S.pieces=parseInt(sc.dataset.p,10); render();
+  });
+});
+["rowsInput","colsInput"].forEach(id=>{
+  $("#"+id).addEventListener("input", ()=>{
+    S.rows=Math.max(2, parseInt($("#rowsInput").value||2,10));
+    S.cols=Math.max(2, parseInt($("#colsInput").value||2,10));
+    render();
+  });
+});
+
+$("#pickBtn").addEventListener("click", ()=>$("#fileInput").click());
+$("#fileInput").addEventListener("change", ()=>{
+  S.files=[...$("#fileInput").files].slice(0,5); S.cur=0; render();
+});
+
+$("#zoomRange").addEventListener("input", ()=>{
+  S.zoom = parseInt($("#zoomRange").value,10)/100; $("#zoomVal").textContent = Math.round(S.zoom*100)+"%"; render();
+});
+$("#fitBtn").addEventListener("click", ()=>{ S.zoom=1; $("#zoomRange").value=100; $("#zoomVal").textContent="100%"; render(); });
+$("#clrBtn").addEventListener("click", ()=>{ S.files=[]; S.cur=0; $("#fileInput").value=""; $("#dlBtn").disabled=true; render(); });
+$("#dlBtn").addEventListener("click", ()=>{ if(S.lastPNG) downloadBlob(S.lastPNG, "jigsaw_last.png"); });
+
+$("#thickRange").addEventListener("input", ()=>{
+  S.line.thickness = +$("#thickRange").value; $("#thickVal").textContent = S.line.thickness.toFixed(1); render();
+});
+$("#opacityRange").addEventListener("input", ()=>{
+  S.line.opacity = +$("#opacityRange").value; $("#opacityVal").textContent = S.line.opacity.toFixed(2); render();
+});
+
+$("#genBtn").addEventListener("click", generateZip);
+
+/* =========== Init =========== */
+(function init(){
+  $("#bookChips .chip[data-size='8.5x11']").classList.add("on");
+  $("#catChips .chip[data-cat='kids']").classList.add("on");
+  showCat("kids");
+  // default select 24
+  const def = $("#kidsRow .subchip[data-p='24']"); if(def) def.classList.add("on");
+  S.pieces=24;
+  $("#thickVal").textContent = S.line.thickness.toFixed(1);
+  $("#opacityVal").textContent = S.line.opacity.toFixed(2);
+  render();
+})();
+</script>
+</body>
+</html>
